@@ -1,9 +1,9 @@
 import type { ZodEnum } from "zod";
 import { z } from "zod";
 
+import { getFeatureOptInService } from "@calcom/features/di/containers/FeatureOptInService";
 import { TeamRepository } from "@calcom/features/ee/teams/repositories/TeamRepository";
 import { isOptInFeature } from "@calcom/features/feature-opt-in/config";
-import { FeatureOptInService } from "@calcom/features/feature-opt-in/services/FeatureOptInService";
 import { FeaturesRepository } from "@calcom/features/flags/features.repository";
 import { MembershipRepository } from "@calcom/features/membership/repositories/MembershipRepository";
 import { prisma } from "@calcom/prisma";
@@ -12,13 +12,13 @@ import { TRPCError } from "@trpc/server";
 
 import authedProcedure from "../../../procedures/authedProcedure";
 import { router } from "../../../trpc";
-import { createOrgPbacProcedure, createTeamPbacProcedure } from "./util";
+import { createOrgPbacProcedure, createTeamPbacProcedure } from "../../../procedures/pbacProcedures";
 
 const featureStateSchema: ZodEnum<["enabled", "disabled", "inherit"]> = z.enum(["enabled", "disabled", "inherit"]);
 
-const featuresRepository: FeaturesRepository = new FeaturesRepository(prisma);
-const featureOptInService: FeatureOptInService = new FeatureOptInService(featuresRepository);
-const teamRepository: TeamRepository = new TeamRepository(prisma);
+const featureOptInService = getFeatureOptInService();
+const featuresRepository = new FeaturesRepository(prisma);
+const teamRepository = new TeamRepository(prisma);
 
 async function getUserOrgAndTeamIds(userId: number): Promise<{ orgId: number | null; teamIds: number[] }> {
   const memberships = await MembershipRepository.findAllByUserId({
@@ -60,7 +60,7 @@ export const featureOptInRouter = router({
    * Used by team admins to configure feature opt-in for their team.
    * Also returns the organization state if the team belongs to an organization.
    */
-  listForTeam: createTeamPbacProcedure("team.read").query(async ({ input }) => {
+  listForTeam: createTeamPbacProcedure("featureOptIn.read").query(async ({ input }) => {
     // Get the team's parent organization ID (if any)
     const parentOrg = await teamRepository.findParentOrganizationByTeamId(input.teamId);
     const parentOrgId = parentOrg?.id ?? null;
@@ -72,14 +72,9 @@ export const featureOptInRouter = router({
    * Get all opt-in features with states for organization settings page.
    * Used by org admins to configure feature opt-in for their organization.
    */
-  listForOrganization: createOrgPbacProcedure("organization.read").query(async ({ ctx }) => {
-    // organizationId is guaranteed to exist after createOrgPbacProcedure middleware
-    const organizationId = ctx.user.organizationId;
-    if (!organizationId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required." });
-    }
+  listForOrganization: createOrgPbacProcedure("featureOptIn.read").query(async ({ ctx }) => {
     // Organizations use the same listFeaturesForTeam since they're stored in TeamFeatures
-    return featureOptInService.listFeaturesForTeam({ teamId: organizationId });
+    return featureOptInService.listFeaturesForTeam({ teamId: ctx.organizationId });
   }),
 
   checkFeatureOptInEligibility: authedProcedure
@@ -126,7 +121,7 @@ export const featureOptInRouter = router({
   /**
    * Set team's feature state (requires team admin).
    */
-  setTeamState: createTeamPbacProcedure("team.update")
+  setTeamState: createTeamPbacProcedure("featureOptIn.update")
     .input(
       z.object({
         slug: z.string(),
@@ -154,7 +149,7 @@ export const featureOptInRouter = router({
   /**
    * Set organization's feature state (requires org admin).
    */
-  setOrganizationState: createOrgPbacProcedure("organization.update")
+  setOrganizationState: createOrgPbacProcedure("featureOptIn.update")
     .input(
       z.object({
         slug: z.string(),
@@ -162,12 +157,6 @@ export const featureOptInRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // organizationId is guaranteed to exist after createOrgPbacProcedure middleware
-      const organizationId = ctx.user.organizationId;
-      if (!organizationId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required." });
-      }
-
       if (!isOptInFeature(input.slug)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -177,7 +166,7 @@ export const featureOptInRouter = router({
 
       // Organizations use the same TeamFeatures table
       await featureOptInService.setTeamFeatureState({
-        teamId: organizationId,
+        teamId: ctx.organizationId,
         featureId: input.slug,
         state: input.state,
         assignedBy: ctx.user.id,
@@ -211,7 +200,7 @@ export const featureOptInRouter = router({
   /**
    * Get team's auto opt-in preference (requires team admin).
    */
-  getTeamAutoOptIn: createTeamPbacProcedure("team.read").query(async ({ input }) => {
+  getTeamAutoOptIn: createTeamPbacProcedure("featureOptIn.read").query(async ({ input }) => {
     const result = await featuresRepository.getTeamsAutoOptIn([input.teamId]);
     return { autoOptIn: result[input.teamId] ?? false };
   }),
@@ -219,7 +208,7 @@ export const featureOptInRouter = router({
   /**
    * Set team's auto opt-in preference (requires team admin).
    */
-  setTeamAutoOptIn: createTeamPbacProcedure("team.update")
+  setTeamAutoOptIn: createTeamPbacProcedure("featureOptIn.update")
     .input(
       z.object({
         autoOptIn: z.boolean(),
@@ -233,32 +222,22 @@ export const featureOptInRouter = router({
   /**
    * Get organization's auto opt-in preference (requires org admin).
    */
-  getOrganizationAutoOptIn: createOrgPbacProcedure("organization.read").query(async ({ ctx }) => {
-    // organizationId is guaranteed to exist after createOrgPbacProcedure middleware
-    const organizationId = ctx.user.organizationId;
-    if (!organizationId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required." });
-    }
-    const result = await featuresRepository.getTeamsAutoOptIn([organizationId]);
-    return { autoOptIn: result[organizationId] ?? false };
+  getOrganizationAutoOptIn: createOrgPbacProcedure("featureOptIn.read").query(async ({ ctx }) => {
+    const result = await featuresRepository.getTeamsAutoOptIn([ctx.organizationId]);
+    return { autoOptIn: result[ctx.organizationId] ?? false };
   }),
 
   /**
    * Set organization's auto opt-in preference (requires org admin).
    */
-  setOrganizationAutoOptIn: createOrgPbacProcedure("organization.update")
+  setOrganizationAutoOptIn: createOrgPbacProcedure("featureOptIn.update")
     .input(
       z.object({
         autoOptIn: z.boolean(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // organizationId is guaranteed to exist after createOrgPbacProcedure middleware
-      const organizationId = ctx.user.organizationId;
-      if (!organizationId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Organization ID is required." });
-      }
-      await featuresRepository.setTeamAutoOptIn(organizationId, input.autoOptIn);
+      await featuresRepository.setTeamAutoOptIn(ctx.organizationId, input.autoOptIn);
       return { success: true };
     }),
 });
