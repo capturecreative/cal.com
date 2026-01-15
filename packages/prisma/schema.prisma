@@ -264,7 +264,6 @@ model EventType {
   updatedAt DateTime? @updatedAt
 
   // @@partial_index([instantMeetingScheduleId])
-
   @@unique([userId, slug])
   @@unique([teamId, slug])
   @@unique([userId, parentId])
@@ -834,7 +833,7 @@ model Booking {
   id                           Int                               @id @default(autoincrement())
   uid                          String                            @unique
   // (optional) UID based on slot start/end time & email against duplicates
-  idempotencyKey               String?                           @unique
+  idempotencyKey               String?
   user                         User?                             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId                       Int?
   // User's email at the time of booking
@@ -898,8 +897,8 @@ model Booking {
   expenseLogs                  CreditExpenseLog[]
   report                       BookingReport?
 
+  @@unique([idempotencyKey, userId, eventTypeId])
   // @@partial_index([reassignById])
-
   @@index([eventTypeId])
   @@index([userId])
   @@index([destinationCalendarId])
