@@ -222,11 +222,11 @@ export class BookingsController_2024_04_15 {
         },
       });
       if (booking.userId && booking.uid && booking.startTime) {
-        void (await this.billingService.increaseUsageByUserId(booking.userId, {
-          uid: booking.uid,
-          startTime: booking.startTime,
-          fromReschedule: booking.fromReschedule,
-        }));
+        // void (await this.billingService.increaseUsageByUserId(booking.userId, {
+        //   uid: booking.uid,
+        //   startTime: booking.startTime,
+        //   fromReschedule: booking.fromReschedule,
+        // }));
       }
       return {
         status: SUCCESS_STATUS,
