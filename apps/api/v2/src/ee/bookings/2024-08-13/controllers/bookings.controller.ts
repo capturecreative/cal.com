@@ -163,11 +163,11 @@ export class BookingsController_2024_08_13 {
   ): Promise<CreateBookingOutput_2024_08_13> {
     const booking = await this.bookingsService.createBooking(request, body, user);
 
-    if (Array.isArray(booking)) {
-      await this.bookingsService.billBookings(booking);
-    } else {
-      await this.bookingsService.billBooking(booking);
-    }
+    // if (Array.isArray(booking)) {
+    //   await this.bookingsService.billBookings(booking);
+    // } else {
+    //   await this.bookingsService.billBooking(booking);
+    // }
 
     return {
       status: SUCCESS_STATUS,

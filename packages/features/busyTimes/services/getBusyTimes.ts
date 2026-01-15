@@ -81,6 +81,10 @@ export class BusyTimesService {
         status: BookingStatus.ACCEPTED,
       })}`
     );
+    if (process.env.DISABLE_CONFLICT_CHECKING !== "false") {
+      let busyTimes: EventBusyDetails[] = [];
+      return busyTimes;
+    }
 
     /**
      * A user is considered busy within a given time period if there
@@ -325,6 +329,10 @@ export class BusyTimesService {
     performance.mark("getBusyTimesForLimitChecksStart");
 
     const busyTimes: EventBusyDetails[] = [];
+
+    if (process.env.DISABLE_CONFLICT_CHECKING !== "false") {
+      return busyTimes;
+    }
 
     if (!bookingLimits && !durationLimits) {
       return busyTimes;

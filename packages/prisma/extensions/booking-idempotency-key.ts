@@ -8,12 +8,30 @@ function generateIdempotencyKey({
   endTime,
   userId,
   reassignedById,
+  email,
+  title
 }: {
   startTime: Date | string;
   endTime: Date | string;
   userId?: number;
   reassignedById?: number | null;
+  email?: string | null;
+  title?: string | null;
 }) {
+  if (process.env.DISABLE_CONFLICT_CHECKING !== "false") {
+    return uuidv5(
+      `${startTime.valueOf()}.${endTime.valueOf()}.${userId}${reassignedById ? `.${reassignedById}` : ""}${
+        email ? `.${email}` : ""
+      }`,
+      uuidv5.URL
+    );
+  //   return uuidv5(
+  //     `${startTime.valueOf()}.${endTime.valueOf()}.${userId}${reassignedById ? `.${reassignedById}` : ""}${
+  //       email ? `.${email}` : ""
+  //     }${title ? `.${title}` : ""}`,
+  //     uuidv5.URL
+  //   );
+  }
   return uuidv5(
     `${startTime.valueOf()}.${endTime.valueOf()}.${userId}${reassignedById ? `.${reassignedById}` : ""}`,
     uuidv5.URL
@@ -31,6 +49,8 @@ export function bookingIdempotencyKeyExtension() {
               endTime: args.data.endTime,
               userId: args.data.user?.connect?.id,
               reassignedById: args.data.reassignById,
+              email: (args.data.responses as any)?.email ?? null,
+              title: args.data.title ?? null,
             });
             args.data.idempotencyKey = idempotencyKey;
           }
