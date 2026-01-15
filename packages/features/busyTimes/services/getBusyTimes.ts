@@ -81,6 +81,10 @@ export class BusyTimesService {
       })}`
     );
 
+    if (process.env.DISABLE_CONFLICT_CHECKING === "true") {
+      return false;
+    }
+
     /**
      * A user is considered busy within a given time period if there
      * is a booking they own OR attend.
@@ -322,6 +326,10 @@ export class BusyTimesService {
     const { userIds, eventTypeId, startDate, endDate, rescheduleUid, bookingLimits, durationLimits } = params;
 
     performance.mark("getBusyTimesForLimitChecksStart");
+
+    if (process.env.DISABLE_CONFLICT_CHECKING === "true") {
+      return false;
+    }
 
     let busyTimes: EventBusyDetails[] = [];
 

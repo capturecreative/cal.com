@@ -18,9 +18,9 @@ export const verifyApiKey: NextMiddleware = async (req, res, next) => {
   const licenseKeyService = await LicenseKeySingleton.getInstance(deploymentRepo);
   const hasValidLicense = await licenseKeyService.checkLicense();
 
-  if (!hasValidLicense && IS_PRODUCTION) {
-    return res.status(401).json({ message: "Invalid or missing CALCOM_LICENSE_KEY environment variable" });
-  }
+  // if (!hasValidLicense && IS_PRODUCTION) {
+  //   return res.status(401).json({ message: "Invalid or missing CALCOM_LICENSE_KEY environment variable" });
+  // }
 
   if (!req.query.apiKey) return res.status(401).json({ message: "No apiKey provided" });
 

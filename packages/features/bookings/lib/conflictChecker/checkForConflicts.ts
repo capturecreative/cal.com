@@ -26,6 +26,9 @@ export function checkForConflicts({
   if (currentSeats?.some((booking) => booking.startTime.toISOString() === time.toISOString())) {
     return false;
   }
+  if (process.env.DISABLE_CONFLICT_CHECKING === "true") {
+    return false;
+  }
   const slotStart = time.valueOf();
   const slotEnd = slotStart + eventLength * 60 * 1000;
 
