@@ -2,6 +2,7 @@ import { shallow } from "zustand/shallow";
 
 import dayjs from "@calcom/dayjs";
 import { useBookerStoreContext } from "@calcom/features/bookings/Booker/BookerStoreProvider";
+import { getQueryParam } from "@calcom/features/bookings/Booker/utils/query-param";
 import type { BookerState } from "@calcom/features/bookings/Booker/types";
 import { getPrefetchMonthCount } from "@calcom/features/bookings/Booker/utils/getPrefetchMonthCount";
 import { isPrefetchNextMonthEnabled } from "@calcom/features/bookings/Booker/utils/isPrefetchNextMonthEnabled";
@@ -90,7 +91,10 @@ export const useTimesForSchedule = ({
   dayCount,
   bookerLayout,
 }: UseTimesForScheduleProps): [string, string] => {
-  const [monthFromStore, bookerState] = useBookerStoreContext((state) => [state.month, state.state], shallow);
+  const [monthFromStore, bookerState, timezone] = useBookerStoreContext(
+    (state) => [state.month, state.state, state.timezone],
+    shallow
+  );
   const month = monthFromStore ?? monthFromProps ?? null;
   const date = dayjs(selectedDate).format("YYYY-MM-DD");
   const prefetchData = usePrefetch({
@@ -123,5 +127,30 @@ export const useTimesForSchedule = ({
     startTime = monthDayjs.startOf("month").toISOString();
     endTime = (lastMonthToPrefetchDayjs ? lastMonthToPrefetchDayjs : monthDayjs).endOf("month").toISOString();
   }
+
+  // Fork patch (capture client portal): when the portal forwards a selected
+  // package's validity window as `startDate`/`endDate` query params, clamp the
+  // slot-fetch range to it. The server already filters returned slots to
+  // [startTime, endTime] and the DatePicker disables days with no slots, so this
+  // single clamp limits the bookable calendar to the package window without any
+  // other UI/store changes. Bounds are inclusive calendar days in the booker's
+  // timezone. Absent params are a no-op.
+  const rangeStart = getQueryParam("startDate");
+  const rangeEnd = getQueryParam("endDate");
+  if (rangeStart || rangeEnd) {
+    const tz = timezone || dayjs.tz.guess();
+    if (rangeStart) {
+      const lo = dayjs.tz(rangeStart, tz).startOf("day");
+      if (lo.isValid() && lo.isAfter(dayjs(startTime))) startTime = lo.toISOString();
+    }
+    if (rangeEnd) {
+      const hi = dayjs.tz(rangeEnd, tz).endOf("day");
+      if (hi.isValid() && hi.isBefore(dayjs(endTime))) endTime = hi.toISOString();
+    }
+    // No overlap (e.g. browsing a month outside the window): collapse to an empty
+    // range so the server returns no slots and every day disables cleanly.
+    if (dayjs(startTime).isAfter(dayjs(endTime))) endTime = startTime;
+  }
+
   return [startTime, endTime];
 };

@@ -19,6 +19,7 @@ import { useEffect, useMemo } from "react";
 import { shallow } from "zustand/shallow";
 import i18nConfigration from "../../../../../i18n.json";
 import { EventDetails, EventMembers, EventMetaSkeleton, EventTitle } from "./event-meta";
+import { PackageDateBanner } from "./PackageDateBanner";
 import { ScrollableWithGradients } from "./ScrollableWithGradients";
 
 const WebTimezoneSelect = dynamic(
@@ -271,6 +272,7 @@ export const EventMeta = ({
               </EventMetaBlock>
             ) : null}
           </div>
+          <PackageDateBanner />
           {children && <div className={classNames?.eventMetaChildren}>{children}</div>}
         </m.div>
       )}
